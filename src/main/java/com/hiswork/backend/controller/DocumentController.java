@@ -15,6 +15,7 @@ import com.hiswork.backend.service.DocumentService;
 import com.hiswork.backend.service.ExcelParsingService;
 import com.hiswork.backend.service.MailService;
 import com.hiswork.backend.service.PdfService;
+import com.hiswork.backend.service.SigningTokenService;
 import com.hiswork.backend.util.AuthUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -52,6 +53,7 @@ public class DocumentController {
     private final ExcelParsingService excelParsingService;
     private final BulkDocumentService bulkDocumentService;
     private final MailService mailService;
+    private final SigningTokenService signingTokenService;
 
     @PostMapping
     public ResponseEntity<?> createDocument(
@@ -776,6 +778,8 @@ public class DocumentController {
 
     /**
      * 관리자가 작업자에게 메일 전송 API
+     * - 서명자(SIGNER)인 경우: anonymous token이 포함된 서명 요청 이메일 발송
+     * - 그 외(EDITOR, REVIEWER): 일반 관리자 메시지 발송
      */
     @PostMapping("/{id}/send-message")
     public ResponseEntity<?> sendMessageToWorker(
@@ -783,22 +787,23 @@ public class DocumentController {
             @RequestBody Map<String, String> request,
             HttpServletRequest httpRequest) {
 
-        log.info("관리자 메시지 전송 요청 - DocumentId: {}, RecipientEmail: {}", 
-                id, request.get("recipientEmail"));
+        String recipientRole = request.get("recipientRole");
+        log.info("관리자 메시지 전송 요청 - DocumentId: {}, RecipientEmail: {}, Role: {}",
+                id, request.get("recipientEmail"), recipientRole);
 
         try {
             User currentUser = getCurrentUser(httpRequest);
-            
-            log.info("현재 사용자 정보 - ID: {}, 이메일: {}, Position: {}", 
-                    currentUser.getId(), 
-                    currentUser.getEmail(), 
+
+            log.info("현재 사용자 정보 - ID: {}, 이메일: {}, Position: {}",
+                    currentUser.getId(),
+                    currentUser.getEmail(),
                     currentUser.getPosition());
-            
+
             // 관리자 권한 체크 - position이 교직원인 경우
             boolean isAdmin = currentUser.getPosition() == Position.교직원;
-            
+
             log.info("관리자 여부 체크: isAdmin={}", isAdmin);
-            
+
             if (!isAdmin) {
                 log.warn("권한 없음 - Position: {}", currentUser.getPosition());
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -810,6 +815,7 @@ public class DocumentController {
                     .orElseThrow(() -> new RuntimeException("문서를 찾을 수 없습니다."));
 
             String recipientEmail = request.get("recipientEmail");
+            String recipientName = request.get("recipientName");
             String message = request.get("message");
 
             if (recipientEmail == null || recipientEmail.trim().isEmpty()) {
@@ -817,6 +823,27 @@ public class DocumentController {
                         .body(Map.of("error", "받는 사람 이메일이 필요합니다."));
             }
 
+            String documentTitle = document.getTitle() != null ? document.getTitle() : document.getTemplate().getName();
+
+            // 서명자(SIGNER)인 경우: 토큰 기반 서명 요청 이메일 발송
+            if ("SIGNER".equals(recipientRole)) {
+                log.info("서명자에게 토큰 기반 서명 요청 이메일 발송 - 문서: {}, 서명자: {}", id, recipientEmail);
+
+                // SigningTokenService를 통해 토큰 생성 및 이메일 발송
+                signingTokenService.createAndSendToken(
+                    document.getId(),
+                    recipientEmail,
+                    recipientName != null ? recipientName : recipientEmail,
+                    documentTitle
+                );
+
+                log.info("서명자 토큰 이메일 전송 성공 - From: {}, To: {}", currentUser.getEmail(), recipientEmail);
+
+                return ResponseEntity.ok()
+                        .body(Map.of("success", true, "message", "서명 요청 이메일이 성공적으로 전송되었습니다."));
+            }
+
+            // 그 외(EDITOR, REVIEWER): 일반 관리자 메시지 발송
             if (message == null || message.trim().isEmpty()) {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "메시지 내용이 필요합니다."));
@@ -832,7 +859,7 @@ public class DocumentController {
                     .recipientName(recipient.getName())
                     .senderName(currentUser.getName())
                     .message(message)
-                    .documentTitle(document.getTitle() != null ? document.getTitle() : document.getTemplate().getName())
+                    .documentTitle(documentTitle)
                     .documentId(document.getId())
                     .build();
 
