@@ -91,18 +91,6 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     List<Document> findTodoDocumentsByUserId(@Param("userId") String userId);
     
     /**
-     * 특정 템플릿 ID로 문서들을 조회하고, 현재 사용자가 EDITOR인 문서만 필터링
-     */
-    @Query("SELECT DISTINCT d FROM Document d " +
-           "LEFT JOIN FETCH d.folder " +
-           "LEFT JOIN FETCH d.documentRoles dr " +
-           "WHERE d.template.id = :templateId " +
-           "AND dr.assignedUserId = :userId " +
-           "AND dr.taskRole = com.hiswork.backend.domain.DocumentRole$TaskRole.EDITOR " +
-           "ORDER BY d.updatedAt DESC")
-    List<Document> findByTemplateIdAndEditorUserId(@Param("templateId") Long templateId, @Param("userId") String userId);
-    
-    /**
      * 특정 상태이고 마감일이 특정 범위 내에 있는 문서 조회
      * (마감일 알림을 위한 메서드)
      */

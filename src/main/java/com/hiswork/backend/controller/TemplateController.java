@@ -215,8 +215,9 @@ public class TemplateController {
         Template existingTemplate = templateService.getTemplateById(id)
                 .orElseThrow(() -> new RuntimeException("템플릿을 찾을 수 없습니다."));
 
-        // 권한 확인
-        if (!existingTemplate.getCreatedBy().getId().equals(user.getId())) {
+        // 권한 확인 - 교직원이거나 템플릿 생성자인 경우 수정 가능
+        if (!existingTemplate.getCreatedBy().getId().equals(user.getId()) 
+                && user.getPosition() != Position.교직원) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "템플릿을 수정할 권한이 없습니다."));
         }

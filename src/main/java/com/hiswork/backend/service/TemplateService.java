@@ -40,8 +40,9 @@ public class TemplateService {
         Template template = templateRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Template not found"));
         
-        // 생성자만 수정 가능
-        if (!template.getCreatedBy().getId().equals(user.getId())) {
+        // 교직원이거나 생성자인 경우 수정 가능
+        if (!template.getCreatedBy().getId().equals(user.getId()) 
+                && user.getPosition() != com.hiswork.backend.domain.Position.교직원) {
             throw new RuntimeException("템플릿을 수정할 권한이 없습니다");
         }
         
@@ -71,8 +72,9 @@ public class TemplateService {
         Template template = templateRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Template not found"));
         
-        // 생성자만 삭제 가능
-        if (!template.getCreatedBy().getId().equals(user.getId())) {
+        // 교직원이거나 생성자인 경우 삭제 가능
+        if (!template.getCreatedBy().getId().equals(user.getId()) 
+                && user.getPosition() != com.hiswork.backend.domain.Position.교직원) {
             throw new RuntimeException("템플릿을 삭제할 권한이 없습니다");
         }
         
