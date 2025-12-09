@@ -53,7 +53,7 @@ app:
   frontend:
     url: ${FRONTEND_URL:http://localhost:5173}
   signing-token:
-    expiry-days: 3
+    expiry-days: 7
 
 jwt:
   secret_key: ${JWT_SECRET_KEY}
