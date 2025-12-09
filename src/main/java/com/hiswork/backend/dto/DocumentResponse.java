@@ -80,7 +80,8 @@ public class DocumentResponse {
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private Boolean isNew;
-        
+        private LocalDateTime tokenExpiresAt; // 서명자 토큰 만료일 (SIGNER만 해당)
+
         public static TaskInfo from(DocumentRole documentRole) {
             return TaskInfo.builder()
                     .id(documentRole.getId())
@@ -91,6 +92,20 @@ public class DocumentResponse {
                     .createdAt(documentRole.getCreatedAt())
                     .updatedAt(documentRole.getUpdatedAt())
                     .isNew(documentRole.isNew())
+                    .build();
+        }
+
+        public static TaskInfo from(DocumentRole documentRole, LocalDateTime tokenExpiresAt) {
+            return TaskInfo.builder()
+                    .id(documentRole.getId())
+                    .role(documentRole.getTaskRole().name())
+                    .assignedUserName(documentRole.getPendingName())
+                    .assignedUserEmail(documentRole.getPendingEmail())
+                    .lastViewedAt(documentRole.getLastViewedAt())
+                    .createdAt(documentRole.getCreatedAt())
+                    .updatedAt(documentRole.getUpdatedAt())
+                    .isNew(documentRole.isNew())
+                    .tokenExpiresAt(tokenExpiresAt)
                     .build();
         }
     }

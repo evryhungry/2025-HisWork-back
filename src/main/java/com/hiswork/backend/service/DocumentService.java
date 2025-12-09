@@ -8,6 +8,7 @@ import com.hiswork.backend.domain.Document;
 import com.hiswork.backend.domain.DocumentRole;
 import com.hiswork.backend.domain.DocumentStatusLog;
 import com.hiswork.backend.domain.NotificationType;
+import com.hiswork.backend.domain.SigningToken;
 import com.hiswork.backend.domain.Position;
 import com.hiswork.backend.domain.Role;
 import com.hiswork.backend.domain.Template;
@@ -19,6 +20,7 @@ import com.hiswork.backend.dto.MailRequest;
 import com.hiswork.backend.repository.DocumentRepository;
 import com.hiswork.backend.repository.DocumentRoleRepository;
 import com.hiswork.backend.repository.DocumentStatusLogRepository;
+import com.hiswork.backend.repository.SigningTokenRepository;
 import com.hiswork.backend.repository.TemplateRepository;
 import com.hiswork.backend.repository.UserRepository;
 import java.time.LocalDateTime;
@@ -47,6 +49,7 @@ public class DocumentService {
     private final TemplateRepository templateRepository;
     private final DocumentRoleRepository documentRoleRepository;
     private final DocumentStatusLogRepository documentStatusLogRepository;
+    private final SigningTokenRepository signingTokenRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final PasswordEncoder passwordEncoder;
@@ -310,18 +313,9 @@ public class DocumentService {
                 .build();
         
         documentRoleRepository.save(reviewerRole);
-        
+
         // 검토자에게 알림 생성
         createDocumentAssignmentNotification(reviewer, document, DocumentRole.TaskRole.REVIEWER);
-
-//        mailService.sendAssignReviewerNotification(MailRequest.ReviewerAssignmentEmailCommand.builder()
-//                        .documentId(document.getId())
-//                        .documentTitle(document.getTitle())
-//                        .editorName(assignedBy.getName())
-//                        .reviewerEmail(reviewerEmail)
-//                        .reviewerName(reviewer.getName())
-//                        .reviewDueDate(document.getDeadline() != null ? document.getDeadline().atZone(java.time.ZoneId.systemDefault()) : null)
-//                .build());
 
         // 검토자 지정만 하고 상태는 READY_FOR_REVIEW 유지
         documentRepository.save(document);
@@ -639,29 +633,11 @@ public class DocumentService {
             
             documentRoleRepository.save(reviewerRole);
             
-            log.info("템플릿 생성자를 검토자로 자동 지정 - 문서 ID: {}, 검토자: {} ({})", 
+            log.info("템플릿 생성자를 검토자로 자동 지정 - 문서 ID: {}, 검토자: {} ({})",
                     documentId, templateCreator.getName(), templateCreator.getEmail());
-            
+
             // 템플릿 생성자에게 알림 생성
             createDocumentAssignmentNotification(templateCreator, document, DocumentRole.TaskRole.REVIEWER);
-            
-            // 템플릿 생성자에게 이메일 발송
-//            try {
-//                mailService.sendAssignReviewerNotification(MailRequest.ReviewerAssignmentEmailCommand.builder()
-//                        .documentId(document.getId())
-//                        .documentTitle(document.getTitle())
-//                        .editorName(user.getName())
-//                        .reviewerEmail(templateCreator.getEmail())
-//                        .reviewerName(templateCreator.getName())
-//                        .reviewDueDate(document.getDeadline() != null ?
-//                                document.getDeadline().atZone(java.time.ZoneId.systemDefault()) : null)
-//                        .build());
-//
-//                log.info("템플릿 생성자에게 검토 알림 이메일 발송 완료 - 수신자: {}", templateCreator.getEmail());
-//            } catch (Exception e) {
-//                log.error("템플릿 생성자에게 검토 알림 이메일 발송 실패: {}", e.getMessage(), e);
-//                // 이메일 발송 실패는 전체 프로세스를 중단시키지 않음
-//            }
         } else {
             log.info("템플릿 생성자가 이미 검토자로 지정되어 있음 - 문서 ID: {}, 검토자: {}", 
                     documentId, templateCreator.getEmail());
@@ -702,15 +678,15 @@ public class DocumentService {
         if (documentOpt.isEmpty()) {
             return null;
         }
-        
+
         Document document = documentOpt.get();
-        
+
         // TaskInfo 생성 시 실제 사용자 정보 포함
         List<DocumentResponse.TaskInfo> taskInfos = document.getDocumentRoles().stream()
                 .map(role -> {
                     String userEmail = null;
                     String userName = null;
-                    
+
                     // assignedUserId가 있으면 실제 사용자 정보 조회
                     if (role.getAssignedUserId() != null) {
                         Optional<User> userOpt = userRepository.findById(role.getAssignedUserId());
@@ -724,7 +700,17 @@ public class DocumentService {
                         userEmail = role.getPendingEmail();
                         userName = role.getPendingName();
                     }
-                    
+
+                    // 서명자인 경우 토큰 만료일 조회 (토큰이 존재하면 항상 표시)
+                    LocalDateTime tokenExpiresAt = null;
+                    if (role.getTaskRole() == DocumentRole.TaskRole.SIGNER && userEmail != null) {
+                        Optional<SigningToken> tokenOpt = signingTokenRepository
+                                .findByDocumentIdAndSignerEmail(document.getId(), userEmail);
+                        if (tokenOpt.isPresent()) {
+                            tokenExpiresAt = tokenOpt.get().getExpiresAt();
+                        }
+                    }
+
                     return DocumentResponse.TaskInfo.builder()
                             .id(role.getId())
                             .role(role.getTaskRole().name())
@@ -734,6 +720,7 @@ public class DocumentService {
                             .createdAt(role.getCreatedAt())
                             .updatedAt(role.getUpdatedAt())
                             .isNew(role.isNew()) // 새로운 할당인지 확인
+                            .tokenExpiresAt(tokenExpiresAt) // 서명자 토큰 만료일
                             .build();
                 })
                 .collect(Collectors.toList());
