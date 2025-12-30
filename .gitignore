@@ -181,6 +181,9 @@ gradle-app.setting
 *.hprof
 
 .env
+.env.production
+.env.development
+
 uploads/
 .idea/misc.xml
 .idea/modules.xml
