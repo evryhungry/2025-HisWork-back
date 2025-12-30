@@ -3,26 +3,20 @@ package com.hiswork.backend.service;
 import com.hiswork.backend.domain.User;
 import com.hiswork.backend.dto.FailureRow;
 import com.hiswork.backend.dto.MailRequest;
-import com.hiswork.backend.repository.UserRepository;
 import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
-
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 @Service
 @RequiredArgsConstructor
@@ -87,7 +81,7 @@ public class MailService {
             MimeMessage mime = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mime, true, StandardCharsets.UTF_8.name());
             helper.setTo(command.getReviewerEmail());
-            helper.setSubject("[CoWorks] '" + command.getDocumentTitle() + "' 문서의 서명자로 지정되었음을 알려드립니다.");
+            helper.setSubject("[CoWorks] '" + command.getDocumentTitle() + "' 문서의 검토자로 지정되었음을 알려드립니다.");
             helper.setText(html, true);
 
 //            helper.addInline("logoImage", new ClassPathResource("static/images/hiswork-logo.png"));

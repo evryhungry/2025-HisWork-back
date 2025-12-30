@@ -750,33 +750,6 @@ public class DocumentController {
     }
 
     /**
-     * 템플릿 ID로 문서 조회 API
-     * - 현재 사용자가 EDITOR로 할당된 문서만 반환
-     * - 서명자 정보와 서명 데이터는 제외
-     */
-    @GetMapping("/by-template/{templateId}")
-    public ResponseEntity<?> getDocumentsByTemplateId(
-            @PathVariable Long templateId,
-            HttpServletRequest httpRequest) {
-
-        log.info("템플릿 ID로 문서 조회 요청 - 템플릿 ID: {}", templateId);
-
-        try {
-            User currentUser = getCurrentUser(httpRequest);
-            List<DocumentResponse> documents = documentService.getDocumentsByTemplateId(templateId, currentUser);
-
-            log.info("템플릿 ID {}로 {}개의 문서 조회 완료 - 사용자: {}", 
-                    templateId, documents.size(), currentUser.getEmail());
-
-            return ResponseEntity.ok(documents);
-        } catch (Exception e) {
-            log.error("템플릿 ID로 문서 조회 실패 - 템플릿 ID: {}, 오류: {}", templateId, e.getMessage(), e);
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    /**
      * 관리자가 작업자에게 메일 전송 API
      * - 서명자(SIGNER)인 경우: anonymous token이 포함된 서명 요청 이메일 발송
      * - 그 외(EDITOR, REVIEWER): 일반 관리자 메시지 발송
